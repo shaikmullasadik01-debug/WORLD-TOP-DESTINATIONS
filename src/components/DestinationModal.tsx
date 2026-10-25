@@ -34,6 +34,14 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
   const { favoriteDestinationIds, toggleFavoriteDestination, activeCurrency } = useEventContext();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!destination) return null;
 
   const isFavorite = favoriteDestinationIds.includes(destination.id);
@@ -51,6 +59,7 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="destination-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-slate-950/80 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
@@ -98,7 +107,7 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
               <span aria-hidden="true">·</span>
               <span>{destination.category}</span>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-serif font-bold tracking-tight">
+            <h2 id="destination-modal-title" className="text-3xl sm:text-4xl font-serif font-bold tracking-tight">
               {destination.name}
             </h2>
             <p className="text-sm text-slate-300 max-w-2xl font-light">

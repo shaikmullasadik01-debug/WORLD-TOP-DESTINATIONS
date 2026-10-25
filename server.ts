@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import express, { Request, Response } from 'express';
-import { GoogleGenAI, Type } from '@google/genai';
+import express, { Request, Response, NextFunction } from 'express';
+import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -16,9 +16,47 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-app.use(express.json());
+// Security Headers Middleware
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
+// JSON Body Parser with reasonable size limit
+app.use(express.json({ limit: '1mb' }));
+
+// In-Memory Rate Limiting (Protects AI endpoints against denial-of-service/rapid loop abuse)
+interface RateLimitRecord {
+  count: number;
+  resetTime: number;
+}
+const rateLimitMap = new Map<string, RateLimitRecord>();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+const MAX_REQUESTS_PER_WINDOW = 40; // up to 40 AI queries per minute per IP
+
+function rateLimiter(req: Request, res: Response, next: NextFunction) {
+  const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'client';
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return next();
+  }
+
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return res.status(429).json({
+      error: 'Rate limit exceeded. Please wait a moment before sending more requests.',
+    });
+  }
+
+  record.count += 1;
+  next();
+}
 
 // Initialize GoogleGenAI server-side client
 let ai: GoogleGenAI | null = null;
@@ -31,6 +69,15 @@ if (process.env.GEMINI_API_KEY) {
       },
     },
   });
+}
+
+// Helper: Sanitize string inputs to prevent injection and unbounded allocations
+function sanitizeString(input: unknown, maxLength = 250): string {
+  if (typeof input !== 'string') return '';
+  return input
+    .replace(/[<>]/g, '') // strip HTML tag brackets
+    .trim()
+    .slice(0, maxLength);
 }
 
 // Health check
@@ -50,11 +97,11 @@ app.get('/api/destinations', (_req: Request, res: Response) => {
   });
 });
 
-// Fallback intelligent event planner generator for guaranteed offline/demo reliability
-function generateSmartEventPlanFallback(params: {
+// Deterministic intelligent event planner generator for guaranteed offline/demo reliability
+export function generateSmartEventPlanFallback(params: {
   eventType: string;
   destination: string;
-  date: string;
+  date?: string;
   guestCount: number;
   totalBudgetMinor: number;
   currency: string;
@@ -64,9 +111,11 @@ function generateSmartEventPlanFallback(params: {
   dietaryPreferences?: string;
   indoorOutdoor?: string;
 }) {
-  const { eventType, destination, guestCount, totalBudgetMinor, currency, style, theme } = params;
+  const { eventType, destination, guestCount, totalBudgetMinor } = params;
   const isWedding = eventType.toLowerCase().includes('wedding');
   const isCorporate = eventType.toLowerCase().includes('corporate');
+  const isBirthday = eventType.toLowerCase().includes('birthday');
+  const isCommunity = eventType.toLowerCase().includes('community') || eventType.toLowerCase().includes('festival');
 
   // Realistic category percentages
   let splits: { category: string; pct: number; label: string; rationale: string }[];
@@ -82,19 +131,37 @@ function generateSmartEventPlanFallback(params: {
     ];
   } else if (isCorporate) {
     splits = [
-      { category: 'venue', pct: 0.38, label: 'Convention Hall & Breakout Rooms', rationale: `High-bandwidth ballroom and multi-track presentation suites.` },
+      { category: 'venue', pct: 0.38, label: 'Convention Hall & Breakout Rooms', rationale: `High-bandwidth ballroom and multi-track presentation suites in ${destination}.` },
       { category: 'catering', pct: 0.26, label: 'Executive Luncheons & Gala Dinner', rationale: `Continuous networking coffee lounges, lunch buffet, and evening cocktail reception.` },
       { category: 'equipment', pct: 0.18, label: 'LED Video Walls & Audio Engineering', rationale: `Keynote stage LED wall, live stream broadcast rigging, and interpretation equipment.` },
       { category: 'travel', pct: 0.08, label: 'Keynote Speaker Hospitality & Shuttles', rationale: `Airport VIP transfers and speaker accommodation blocks.` },
       { category: 'contingency', pct: 0.10, label: 'Technical & Production Reserve', rationale: `Reserved for emergency live stream bandwidth or last-minute rider modifications.` },
     ];
+  } else if (isBirthday) {
+    splits = [
+      { category: 'venue', pct: 0.35, label: 'Private Villa / Party Pavilion', rationale: `Exclusive celebratory venue space in ${destination}.` },
+      { category: 'catering', pct: 0.28, label: 'Chef-Curated Feast & Specialty Cake', rationale: `Gourmet dinner, custom multi-tier cake, and artisanal mocktails/cocktails.` },
+      { category: 'decoration', pct: 0.16, label: 'Themed Decor & Photo Installations', rationale: `Immersive backdrop, balloon/floral arches, and customized ambient lighting.` },
+      { category: 'entertainment', pct: 0.10, label: 'DJ, Live Band & Interactive Activities', rationale: `Sound setup, party host, and games tailored to celebrant preferences.` },
+      { category: 'photography', pct: 0.05, label: 'Highlight Reel & Portrait Photography', rationale: `Coverage of arrival moments, toasts, and cake cutting.` },
+      { category: 'contingency', pct: 0.06, label: 'Contingency Reserve', rationale: `Covers overtime fees or sudden party additions.` },
+    ];
+  } else if (isCommunity) {
+    splits = [
+      { category: 'venue', pct: 0.30, label: 'Public Grounds & Permitted Pavilions', rationale: `Community park or municipal amphitheater permit and security bonding.` },
+      { category: 'equipment', pct: 0.25, label: 'Staging, Audio PA & Lighting Truss', rationale: `High-capacity public address audio, stage riser, and crowd control stanchions.` },
+      { category: 'catering', pct: 0.20, label: 'Community Food Stations & Hydration', rationale: `Accessible food truck bays, refreshment distribution, and volunteer catering.` },
+      { category: 'decoration', pct: 0.10, label: 'Wayfinding, Banners & Festoon Lighting', rationale: `Accessibility signage, entrance arches, and weather-resistant festoon lights.` },
+      { category: 'taxes_fees', pct: 0.07, label: 'Municipal Permits, Safety & First Aid', rationale: `Paramedic first-aid post, fire extinguisher certifications, and city permits.` },
+      { category: 'contingency', pct: 0.08, label: 'Weather & Emergency Reserve', rationale: `Emergency tents and temporary ground matting in case of inclement weather.` },
+    ];
   } else {
     splits = [
       { category: 'venue', pct: 0.35, label: 'Private Event Pavilion or Villa', rationale: `Exclusive celebratory venue space in ${destination}.` },
-      { category: 'catering', pct: 0.28, label: 'Chef-Curated Dinner & Specialty Cake', rationale: `Gourmet dinner, custom celebration dessert, and craft mocktails/cocktails.` },
-      { category: 'decoration', pct: 0.15, label: 'Theme Styling, Lighting & Photo Op', rationale: `Customized scenic backdrop, ambient lighting, and floral table settings.` },
-      { category: 'entertainment', pct: 0.10, label: 'DJ, Live Band or Host', rationale: `Curated entertainment and interactive guest activities.` },
-      { category: 'photography', pct: 0.06, label: 'Event Photography & Highlight Reel', rationale: `High-resolution coverage of speeches, cake cutting, and guest portraits.` },
+      { category: 'catering', pct: 0.28, label: 'Chef-Curated Dinner & Specialty Toast', rationale: `Gourmet dinner and craft beverages.` },
+      { category: 'decoration', pct: 0.15, label: 'Theme Styling, Lighting & Centerpieces', rationale: `Customized scenic backdrop, ambient lighting, and floral table settings.` },
+      { category: 'entertainment', pct: 0.10, label: 'DJ, Live Band or Host', rationale: `Curated entertainment and guest activities.` },
+      { category: 'photography', pct: 0.06, label: 'Event Photography & Highlight Reel', rationale: `High-resolution coverage of speeches and guest portraits.` },
       { category: 'contingency', pct: 0.06, label: 'Miscellaneous & Contingency', rationale: `Reserved for overtime fees or unexpected guest additions.` },
     ];
   }
@@ -149,27 +216,34 @@ function generateSmartEventPlanFallback(params: {
   };
 }
 
-// AI Event Planner endpoint
-app.post('/api/ai/plan-event', async (req: Request, res: Response) => {
+// AI Event Planner endpoint with rate limiting and strict validation
+app.post('/api/ai/plan-event', rateLimiter, async (req: Request, res: Response) => {
   try {
-    const {
-      eventType,
-      destination,
-      date,
-      guestCount,
-      totalBudgetMinor,
-      currency = 'INR',
-      style,
-      theme,
-      culturalPreferences,
-      dietaryPreferences,
-      accessibilityRequirements,
-      indoorOutdoor,
-    } = req.body;
+    const rawEventType = sanitizeString(req.body.eventType, 50);
+    const rawDestination = sanitizeString(req.body.destination, 100);
+    const rawDate = sanitizeString(req.body.date, 30);
+    const rawGuestCount = parseInt(req.body.guestCount, 10);
+    const rawTotalBudgetMinor = parseInt(req.body.totalBudgetMinor, 10);
+    const rawCurrency = sanitizeString(req.body.currency, 10) || 'INR';
+    const rawStyle = sanitizeString(req.body.style, 150);
+    const rawTheme = sanitizeString(req.body.theme, 150);
+    const rawCultural = sanitizeString(req.body.culturalPreferences, 250);
+    const rawDietary = sanitizeString(req.body.dietaryPreferences, 250);
+    const rawAccessibility = sanitizeString(req.body.accessibilityRequirements, 250);
+    const rawSetting = sanitizeString(req.body.indoorOutdoor, 20);
 
-    if (!eventType || !destination || !totalBudgetMinor) {
-      return res.status(400).json({ error: 'Missing required fields: eventType, destination, totalBudgetMinor' });
+    // Validation
+    if (!rawEventType || !rawDestination) {
+      return res.status(400).json({ error: 'Please provide valid event type and destination.' });
     }
+
+    if (isNaN(rawTotalBudgetMinor) || rawTotalBudgetMinor < 100000 || rawTotalBudgetMinor > 500000000000) {
+      return res.status(400).json({
+        error: 'Budget amount must be between 1,000 and 5,000,000,000 in major units.',
+      });
+    }
+
+    const guestCount = isNaN(rawGuestCount) || rawGuestCount < 1 ? 100 : Math.min(rawGuestCount, 50000);
 
     // If Gemini client is available, try generating tailored advice
     if (ai) {
@@ -179,15 +253,15 @@ You are an expert luxury event architect and budget strategist for "AI Event Pla
 Generate a personalized, realistic event planning recommendation.
 
 User Request:
-- Event Type: ${eventType}
-- Preferred Destination: ${destination}
-- Target Date: ${date || 'Flexible'}
+- Event Type: ${rawEventType}
+- Preferred Destination: ${rawDestination}
+- Target Date: ${rawDate || 'Flexible'}
 - Number of Guests: ${guestCount}
-- Total Budget: ${totalBudgetMinor / 100} ${currency}
-- Style & Theme: ${style || 'Elegant'} / ${theme || 'Timeless'}
-- Cultural & Dietary Preferences: ${culturalPreferences || 'Standard'} / ${dietaryPreferences || 'Standard'}
-- Accessibility: ${accessibilityRequirements || 'Standard'}
-- Setting: ${indoorOutdoor || 'hybrid'}
+- Total Budget: ${rawTotalBudgetMinor / 100} ${rawCurrency}
+- Style & Theme: ${rawStyle || 'Elegant'} / ${rawTheme || 'Timeless'}
+- Cultural & Dietary Preferences: ${rawCultural || 'Standard'} / ${rawDietary || 'Standard'}
+- Accessibility: ${rawAccessibility || 'Standard'}
+- Setting: ${rawSetting || 'hybrid'}
 
 You must return a strictly formatted JSON object adhering to this schema:
 {
@@ -196,8 +270,8 @@ You must return a strictly formatted JSON object adhering to this schema:
     {
       "category": "venue" | "catering" | "decoration" | "photography" | "entertainment" | "travel" | "accommodation" | "equipment" | "contingency",
       "name": "Short descriptive line item name",
-      "estimateMinor": integer minor units (in ${currency} cents/paise, sum should equal ${totalBudgetMinor}),
-      "rationale": "Why this allocation is appropriate for ${destination}"
+      "estimateMinor": integer minor units (in ${rawCurrency} cents/paise, sum should equal ${rawTotalBudgetMinor}),
+      "rationale": "Why this allocation is appropriate for ${rawDestination}"
     }
   ],
   "assumptions": ["3 to 4 bullet points explaining what is included or excluded"],
@@ -224,23 +298,23 @@ You must return a strictly formatted JSON object adhering to this schema:
           return res.json({ success: true, plan: parsed, provider: 'gemini-3.8-flash' });
         }
       } catch (geminiError) {
-        console.warn('Gemini API call failed, falling back to smart deterministic engine:', geminiError);
+        console.warn('Gemini API call returned fallback signal, activating smart deterministic engine.');
       }
     }
 
     // High quality deterministic fallback engine
     const smartFallback = generateSmartEventPlanFallback({
-      eventType,
-      destination,
-      date,
-      guestCount: guestCount || 100,
-      totalBudgetMinor,
-      currency,
-      style,
-      theme,
-      culturalPreferences,
-      dietaryPreferences,
-      indoorOutdoor,
+      eventType: rawEventType,
+      destination: rawDestination,
+      date: rawDate,
+      guestCount,
+      totalBudgetMinor: rawTotalBudgetMinor,
+      currency: rawCurrency,
+      style: rawStyle,
+      theme: rawTheme,
+      culturalPreferences: rawCultural,
+      dietaryPreferences: rawDietary,
+      indoorOutdoor: rawSetting,
     });
 
     return res.json({
@@ -249,20 +323,22 @@ You must return a strictly formatted JSON object adhering to this schema:
       provider: 'smart-deterministic-planner',
     });
   } catch (err: any) {
-    console.error('Error in /api/ai/plan-event:', err);
-    return res.status(500).json({ error: err.message || 'Internal server error' });
+    console.error('Handled error in /api/ai/plan-event:', err?.message || 'Unknown');
+    return res.status(500).json({ error: 'An unexpected error occurred while generating your plan. Please try again.' });
   }
 });
 
-// AI Theme and Decor Ideas endpoint
-app.post('/api/ai/theme-ideas', async (req: Request, res: Response) => {
+// AI Theme and Decor Ideas endpoint with rate limiting
+app.post('/api/ai/theme-ideas', rateLimiter, async (req: Request, res: Response) => {
   try {
-    const { eventType, destination, vibe } = req.body;
+    const rawEventType = sanitizeString(req.body.eventType, 50) || 'wedding';
+    const rawDestination = sanitizeString(req.body.destination, 100) || 'Udaipur, India';
+    const rawVibe = sanitizeString(req.body.vibe, 150) || 'luxury';
 
     if (ai) {
       try {
         const prompt = `
-Generate 3 distinct creative visual themes and decor concepts for a ${eventType} in ${destination} with a ${vibe || 'luxury'} vibe.
+Generate 3 distinct creative visual themes and decor concepts for a ${rawEventType} in ${rawDestination} with a ${rawVibe} vibe.
 Return JSON array of:
 [
   {
@@ -286,7 +362,7 @@ Return JSON array of:
           return res.json({ success: true, themes: JSON.parse(raw.trim()) });
         }
       } catch (geminiErr) {
-        console.warn('Gemini theme generation fallback:', geminiErr);
+        console.warn('Gemini theme generation fallback signal received.');
       }
     }
 
@@ -295,9 +371,9 @@ Return JSON array of:
       success: true,
       themes: [
         {
-          title: `${destination} Sunset Horizon`,
+          title: `${rawDestination} Sunset Horizon`,
           description: `Terracotta tones, cascading ivory blooms, and warm hanging lanterns framing panoramic vistas.`,
-          imagePrompt: `Luxury ${eventType} setup in ${destination} at twilight, warm fairy light canopy, elegant candlelit tables, fresh white roses, 8k photo`,
+          imagePrompt: `Luxury ${rawEventType} setup in ${rawDestination} at twilight, warm fairy light canopy, elegant candlelit tables, fresh white roses, 8k photo`,
           colorPalette: [
             { name: 'Warm Terracotta', hex: '#E07A5F' },
             { name: 'Sunset Amber', hex: '#F59E0B' },
@@ -310,7 +386,7 @@ Return JSON array of:
       ],
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Unable to synthesize theme concepts at this time.' });
   }
 });
 
@@ -331,7 +407,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[AI Event Planner Pro] Server listening on port ${PORT}`);
+    console.log(`[AI Event Planner Pro] Server listening securely on port ${PORT}`);
   });
 }
 

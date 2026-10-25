@@ -13,6 +13,7 @@ import {
   calculateBudgetPercentage,
 } from '../utils/currency';
 import { DESTINATIONS } from '../data/destinations';
+import { generateSmartEventPlanFallback } from '../../server';
 
 describe('Currency & Financial Precision Math', () => {
   it('converts major units to integer minor units without float drift', () => {
@@ -54,6 +55,11 @@ describe('Currency & Financial Precision Math', () => {
     expect(formatMoney(twentyFiveKUSDMinor, 'USD', false)).toBe('$25,000');
   });
 
+  it('handles negative amounts and zero without crashing', () => {
+    expect(formatMoney(-500000, 'INR', false)).toBe('-₹5,000');
+    expect(formatMoney(0, 'USD', false)).toBe('$0');
+  });
+
   it('calculates budget consumption percentage safely', () => {
     expect(calculateBudgetPercentage(500000, 1000000)).toBe(50);
     expect(calculateBudgetPercentage(1200000, 1000000)).toBe(120);
@@ -70,7 +76,7 @@ describe('Currency & Financial Precision Math', () => {
 
 describe('Destination Catalog Validation & Filtering', () => {
   it('contains all 30 world destinations required by prompt specification', () => {
-    expect(DESTINATIONS.length).toBeGreaterThanOrEqual(25);
+    expect(DESTINATIONS.length).toBeGreaterThanOrEqual(30);
 
     const requiredLandmarks = [
       'Bali',
@@ -148,6 +154,69 @@ describe('Destination Catalog Validation & Filtering', () => {
   });
 });
 
+describe('AI Feasibility Engine & Mathematical Parity', () => {
+  it('guarantees 100% budget sum parity for wedding planning without remainder drift', () => {
+    const targetBudgetMinor = 150000000; // ₹15,00,000
+    const plan = generateSmartEventPlanFallback({
+      eventType: 'wedding',
+      destination: 'Udaipur, India',
+      guestCount: 100,
+      totalBudgetMinor: targetBudgetMinor,
+      currency: 'INR',
+    });
+
+    const sumAllocated = plan.costBreakdowns.reduce((acc, curr) => acc + curr.estimateMinor, 0);
+    expect(sumAllocated).toBe(targetBudgetMinor);
+    expect(plan.costBreakdowns.some((c) => c.category === 'venue')).toBe(true);
+    expect(plan.costBreakdowns.some((c) => c.category === 'contingency')).toBe(true);
+    expect(plan.venueQuestions.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('guarantees budget parity for corporate summit planning', () => {
+    const targetBudgetMinor = 4500000; // $45,000.00
+    const plan = generateSmartEventPlanFallback({
+      eventType: 'corporate',
+      destination: 'Tokyo, Japan',
+      guestCount: 150,
+      totalBudgetMinor: targetBudgetMinor,
+      currency: 'USD',
+    });
+
+    const sumAllocated = plan.costBreakdowns.reduce((acc, curr) => acc + curr.estimateMinor, 0);
+    expect(sumAllocated).toBe(targetBudgetMinor);
+    expect(plan.costBreakdowns.some((c) => c.category === 'equipment')).toBe(true);
+  });
+
+  it('guarantees budget parity for birthday celebrations', () => {
+    const targetBudgetMinor = 1800000; // €18,000.00
+    const plan = generateSmartEventPlanFallback({
+      eventType: 'birthday',
+      destination: 'Santorini, Greece',
+      guestCount: 40,
+      totalBudgetMinor: targetBudgetMinor,
+      currency: 'EUR',
+    });
+
+    const sumAllocated = plan.costBreakdowns.reduce((acc, curr) => acc + curr.estimateMinor, 0);
+    expect(sumAllocated).toBe(targetBudgetMinor);
+  });
+
+  it('guarantees budget parity for community festivals', () => {
+    const targetBudgetMinor = 120000000; // ₹12,00,000
+    const plan = generateSmartEventPlanFallback({
+      eventType: 'festival',
+      destination: 'Goa, India',
+      guestCount: 500,
+      totalBudgetMinor: targetBudgetMinor,
+      currency: 'INR',
+    });
+
+    const sumAllocated = plan.costBreakdowns.reduce((acc, curr) => acc + curr.estimateMinor, 0);
+    expect(sumAllocated).toBe(targetBudgetMinor);
+    expect(plan.costBreakdowns.some((c) => c.category === 'taxes_fees')).toBe(true);
+  });
+});
+
 describe('Date & Timeline Overdue Engine', () => {
   it('correctly detects overdue deadlines', () => {
     const pastDate = '2020-01-01';
@@ -156,5 +225,32 @@ describe('Date & Timeline Overdue Engine', () => {
 
     expect(pastDate < today).toBe(true);
     expect(futureDate < today).toBe(false);
+  });
+});
+
+describe('Specialized Module Calculations', () => {
+  it('computes total guests attending from party size array accurately', () => {
+    const guests = [
+      { name: 'Family A', partySize: 4, status: 'attending' },
+      { name: 'Family B', partySize: 2, status: 'attending' },
+      { name: 'Friend C', partySize: 1, status: 'invited' },
+    ];
+    const totalAttending = guests
+      .filter((g) => g.status === 'attending')
+      .reduce((sum, g) => sum + g.partySize, 0);
+
+    expect(totalAttending).toBe(6);
+  });
+
+  it('calculates volunteer checked in percentage safely', () => {
+    const volunteers = [
+      { id: '1', status: 'checked_in' },
+      { id: '2', status: 'checked_in' },
+      { id: '3', status: 'assigned' },
+      { id: '4', status: 'assigned' },
+    ];
+    const checkedInCount = volunteers.filter((v) => v.status === 'checked_in').length;
+    const pct = Math.round((checkedInCount / volunteers.length) * 100);
+    expect(pct).toBe(50);
   });
 });

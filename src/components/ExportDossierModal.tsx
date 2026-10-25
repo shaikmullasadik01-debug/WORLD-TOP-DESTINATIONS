@@ -23,6 +23,14 @@ export const ExportDossierModal: React.FC<ExportDossierModalProps> = ({ onClose 
     isOverBudget,
   } = useEventContext();
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   if (!activeEvent) return null;
 
   const handlePrint = () => {
@@ -43,6 +51,7 @@ export const ExportDossierModal: React.FC<ExportDossierModalProps> = ({ onClose 
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="export-dossier-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-xs overflow-y-auto animate-fade-in"
       onClick={onClose}
     >
@@ -86,7 +95,7 @@ export const ExportDossierModal: React.FC<ExportDossierModalProps> = ({ onClose 
             <div className="text-xs font-serif tracking-widest uppercase text-amber-700 font-semibold mb-1">
               AI Event Planner Pro · Master Executive Dossier
             </div>
-            <h1 className="text-3xl font-serif font-bold text-slate-950 tracking-tight">
+            <h1 id="export-dossier-title" className="text-3xl font-serif font-bold text-slate-950 tracking-tight">
               {activeEvent.title}
             </h1>
             <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 mt-2 font-medium">

@@ -217,7 +217,10 @@ export interface EventPlan {
     celebrantName: string;
     celebrantAge: number;
     cakeFlavor: string;
-    activities: string[];
+    cakeTiers: number;
+    themeColors: string;
+    giftIdeas: { id: string; item: string; reservedBy?: string; purchased: boolean }[];
+    activities: { id: string; timeSlot: string; title: string; ageGroup: string }[];
   };
   corporateDetails?: {
     companyName: string;
@@ -227,10 +230,12 @@ export interface EventPlan {
   };
   communityDetails?: {
     festivalName: string;
-    safetyChecklist: string[];
+    safetyChecklist: { id: string; item: string; completed: boolean }[];
     sponsorshipGoalMinor: number;
     sponsorshipRaisedMinor: number;
+    sponsors: { id: string; name: string; amountMinor: number; tier: string }[];
     volunteers: VolunteerAssignment[];
+    announcements: { id: string; title: string; timestamp: string; channel: string }[];
   };
 
   aiPlanSummary?: AIPlanSummary;
