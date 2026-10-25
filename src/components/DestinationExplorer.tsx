@@ -25,13 +25,23 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRegion, setSelectedRegion] = useState<string>('All');
+  const [selectedCountry, setSelectedCountry] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
   const [selectedEventType, setSelectedEventType] = useState<string>('All');
   const [selectedTier, setSelectedTier] = useState<string>('All');
+  const [selectedCapacity, setSelectedCapacity] = useState<string>('All');
+  const [selectedSeason, setSelectedSeason] = useState<string>('All');
+  const [selectedSetting, setSelectedSetting] = useState<string>('All');
+  const [selectedAccessibility, setSelectedAccessibility] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'recommended' | 'budget_asc' | 'budget_desc' | 'name'>('recommended');
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+
+  const countries = useMemo(() => {
+    const list = Array.from(new Set(DESTINATIONS.map((d) => d.country))).sort();
+    return ['All', ...list];
+  }, []);
 
   const regions: (DestinationRegion | 'All')[] = [
     'All',
@@ -95,6 +105,11 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
         return false;
       }
 
+      // Country filter
+      if (selectedCountry !== 'All' && dest.country !== selectedCountry) {
+        return false;
+      }
+
       // Category filter
       if (selectedCategory !== 'All' && dest.category !== selectedCategory) {
         return false;
@@ -113,6 +128,42 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
         return false;
       }
 
+      // Guest Capacity filter
+      if (selectedCapacity !== 'All') {
+        const maxCap = dest.guestCapacityRange.max;
+        if (selectedCapacity === 'intimate' && maxCap > 100) return false;
+        if (selectedCapacity === 'mid' && (maxCap < 100 || dest.guestCapacityRange.min > 300)) return false;
+        if (selectedCapacity === 'grand' && (maxCap < 300 || dest.guestCapacityRange.min > 600)) return false;
+        if (selectedCapacity === 'mega' && maxCap < 600) return false;
+      }
+
+      // Preferred Season filter
+      if (selectedSeason !== 'All') {
+        const seasonLower = dest.bestSeason.toLowerCase();
+        const querySeason = selectedSeason.toLowerCase();
+        if (!seasonLower.includes(querySeason) && !seasonLower.includes('year-round')) {
+          return false;
+        }
+      }
+
+      // Indoor / Outdoor filter
+      if (selectedSetting !== 'All') {
+        const venuesLower = dest.venueTypes.map((v) => v.toLowerCase()).join(' ');
+        if (selectedSetting === 'outdoor' && !venuesLower.includes('beach') && !venuesLower.includes('lawn') && !venuesLower.includes('terrace') && !venuesLower.includes('cliff') && !venuesLower.includes('deck')) {
+          return false;
+        }
+        if (selectedSetting === 'indoor' && !venuesLower.includes('ballroom') && !venuesLower.includes('palace') && !venuesLower.includes('hall') && !venuesLower.includes('glasshouse')) {
+          return false;
+        }
+      }
+
+      // Accessibility filter
+      if (selectedAccessibility === 'accessible') {
+        // Luxury resorts and five-star landmark hotels have verified step-free wheelchair accessibility
+        const isAccessible = dest.category === 'Luxury Resorts' || dest.category === 'Modern Cities' || dest.venueTypes.some(v => v.toLowerCase().includes('ballroom') || v.toLowerCase().includes('resort'));
+        if (!isAccessible) return false;
+      }
+
       return true;
     }).sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
@@ -123,9 +174,14 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
   }, [
     searchQuery,
     selectedRegion,
+    selectedCountry,
     selectedCategory,
     selectedEventType,
     selectedTier,
+    selectedCapacity,
+    selectedSeason,
+    selectedSetting,
+    selectedAccessibility,
     sortBy,
     showOnlyFavorites,
     showRecent,
@@ -141,9 +197,14 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedRegion('All');
+    setSelectedCountry('All');
     setSelectedCategory('All');
     setSelectedEventType('All');
     setSelectedTier('All');
+    setSelectedCapacity('All');
+    setSelectedSeason('All');
+    setSelectedSetting('All');
+    setSelectedAccessibility('All');
     setShowOnlyFavorites(false);
     setShowRecent(false);
     setSortBy('recommended');
@@ -151,9 +212,14 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
 
   const activeFiltersCount =
     (selectedRegion !== 'All' ? 1 : 0) +
+    (selectedCountry !== 'All' ? 1 : 0) +
     (selectedCategory !== 'All' ? 1 : 0) +
     (selectedEventType !== 'All' ? 1 : 0) +
     (selectedTier !== 'All' ? 1 : 0) +
+    (selectedCapacity !== 'All' ? 1 : 0) +
+    (selectedSeason !== 'All' ? 1 : 0) +
+    (selectedSetting !== 'All' ? 1 : 0) +
+    (selectedAccessibility !== 'All' ? 1 : 0) +
     (showOnlyFavorites ? 1 : 0) +
     (showRecent ? 1 : 0) +
     (searchQuery ? 1 : 0);
@@ -295,12 +361,30 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
         </div>
 
         {/* Extended Filters (Desktop always, Mobile via toggle) */}
-        <div className={`${showFiltersPanel ? 'block' : 'hidden md:block'} p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3 text-left`}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+        <div className={`${showFiltersPanel ? 'block' : 'hidden md:block'} p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-4 text-left`}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+            {/* Country Filter */}
+            <div>
+              <label htmlFor="filter-country" className="block text-slate-600 font-semibold mb-1">Country</label>
+              <select
+                id="filter-country"
+                value={selectedCountry}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+                className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-800"
+              >
+                {countries.map((c) => (
+                  <option key={c} value={c}>
+                    {c === 'All' ? 'All Countries' : c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Event Type Filter */}
             <div>
-              <label className="block text-slate-600 font-medium mb-1">Event Type Fit</label>
+              <label htmlFor="filter-event-type" className="block text-slate-600 font-semibold mb-1">Event Type</label>
               <select
+                id="filter-event-type"
                 value={selectedEventType}
                 onChange={(e) => setSelectedEventType(e.target.value)}
                 className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-800 capitalize"
@@ -313,38 +397,87 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
               </select>
             </div>
 
-            {/* Budget Tier Filter */}
+            {/* Guest Capacity Filter */}
             <div>
-              <label className="block text-slate-600 font-medium mb-1">Budget Tier</label>
+              <label htmlFor="filter-capacity" className="block text-slate-600 font-semibold mb-1">Guest Capacity</label>
               <select
-                value={selectedTier}
-                onChange={(e) => setSelectedTier(e.target.value)}
+                id="filter-capacity"
+                value={selectedCapacity}
+                onChange={(e) => setSelectedCapacity(e.target.value)}
                 className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-800"
               >
-                <option value="All">All Budget Tiers</option>
-                <option value="$">$ (Under ₹10 Lakhs / $12K)</option>
-                <option value="$$">$$ (₹10L - ₹20 Lakhs / $25K)</option>
-                <option value="$$$">$$$ (₹20L - ₹40 Lakhs / $50K)</option>
-                <option value="$$$$">$$$$ (₹40L - ₹75 Lakhs / $90K)</option>
-                <option value="$$$$$">$$$$$ (₹75L+ / $100K+ Ultra-Luxury)</option>
+                <option value="All">All Capacities</option>
+                <option value="intimate">Intimate (Up to 100)</option>
+                <option value="mid">Mid-Size (100 - 300)</option>
+                <option value="grand">Grand Gala (300 - 600)</option>
+                <option value="mega">Mega / Festival (600+)</option>
               </select>
             </div>
 
-            {/* Active Filters Clear Action */}
-            <div className="flex items-end justify-between sm:justify-end gap-2">
-              <span className="text-slate-500 text-xs">
-                Showing <strong className="text-slate-900">{filteredDestinations.length}</strong> of {DESTINATIONS.length}
-              </span>
-              {activeFiltersCount > 0 && (
-                <button
-                  onClick={handleResetFilters}
-                  className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset All</span>
-                </button>
-              )}
+            {/* Preferred Season Filter */}
+            <div>
+              <label htmlFor="filter-season" className="block text-slate-600 font-semibold mb-1">Preferred Season</label>
+              <select
+                id="filter-season"
+                value={selectedSeason}
+                onChange={(e) => setSelectedSeason(e.target.value)}
+                className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-800"
+              >
+                <option value="All">All Seasons</option>
+                <option value="spring">Spring</option>
+                <option value="summer">Summer</option>
+                <option value="autumn">Autumn / Fall</option>
+                <option value="winter">Winter</option>
+                <option value="year-round">Year-Round</option>
+              </select>
             </div>
+
+            {/* Setting: Indoor / Outdoor */}
+            <div>
+              <label htmlFor="filter-setting" className="block text-slate-600 font-semibold mb-1">Venue Setting</label>
+              <select
+                id="filter-setting"
+                value={selectedSetting}
+                onChange={(e) => setSelectedSetting(e.target.value)}
+                className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-800"
+              >
+                <option value="All">Indoor & Outdoor</option>
+                <option value="outdoor">Pure Outdoor / Beach / Lawn</option>
+                <option value="indoor">Indoor Ballrooms & Palaces</option>
+              </select>
+            </div>
+
+            {/* Accessibility Filter */}
+            <div>
+              <label htmlFor="filter-accessibility" className="block text-slate-600 font-semibold mb-1">Accessibility</label>
+              <select
+                id="filter-accessibility"
+                value={selectedAccessibility}
+                onChange={(e) => setSelectedAccessibility(e.target.value)}
+                className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-800"
+              >
+                <option value="All">All Venues</option>
+                <option value="accessible">Verified Step-Free / Accessible</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Bottom Bar: Active Filters Count, Status, and Reset */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
+            <div aria-live="polite" className="text-slate-600 font-medium">
+              Showing <strong className="text-slate-900">{filteredDestinations.length}</strong> of {DESTINATIONS.length} world destinations
+              {activeFiltersCount > 0 && ` (${activeFiltersCount} active filter${activeFiltersCount > 1 ? 's' : ''})`}
+            </div>
+
+            {activeFiltersCount > 0 && (
+              <button
+                onClick={handleResetFilters}
+                className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-hidden"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Filters</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

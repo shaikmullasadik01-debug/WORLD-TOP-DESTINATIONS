@@ -46,12 +46,13 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Zone 2: Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-600">
+        <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-600" aria-label="Main Navigation">
           {navItems.map((item) => (
             <button
               key={item.tab}
               onClick={() => setActiveTab(item.tab)}
-              className={`flex items-center gap-1.5 py-1 transition-colors whitespace-nowrap shrink-0 relative ${
+              aria-current={activeTab === item.tab ? 'page' : undefined}
+              className={`flex items-center gap-1.5 py-1 transition-colors whitespace-nowrap shrink-0 relative focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:outline-hidden rounded-md px-1 ${
                 activeTab === item.tab
                   ? 'text-slate-950 font-semibold'
                   : 'text-slate-600 hover:text-slate-950'
@@ -113,8 +114,9 @@ export const Navbar: React.FC = () => {
           {/* Mobile menu toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 text-slate-600 hover:text-slate-950 rounded-lg hover:bg-slate-100"
-            aria-label="Toggle menu"
+            className="lg:hidden p-2 text-slate-600 hover:text-slate-950 rounded-lg hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:outline-hidden"
+            aria-label="Toggle navigation menu"
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>

@@ -46,6 +46,7 @@ export const DestinationCard: React.FC<DestinationCardProps> = ({
             onError={() => setImageError(true)}
             referrerPolicy="no-referrer"
             loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-400 p-4 text-center">
@@ -132,16 +133,18 @@ export const DestinationCard: React.FC<DestinationCardProps> = ({
         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
           <button
             onClick={() => onOpenDetails(destination)}
-            className="w-full py-2 px-3 text-xs font-semibold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-center whitespace-nowrap"
+            aria-label={`View details for ${destination.name}, ${destination.country}`}
+            className="w-full py-2 px-3 text-xs font-semibold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-center whitespace-nowrap focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:outline-hidden"
           >
             View Details
           </button>
           <button
             onClick={() => onPlanHere(destination)}
-            className="w-full py-2 px-3 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors flex items-center justify-center gap-1 whitespace-nowrap"
+            aria-label={`Plan an event in ${destination.name}, ${destination.country}`}
+            className="w-full py-2 px-3 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors flex items-center justify-center gap-1 whitespace-nowrap focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:outline-hidden"
           >
             <Sparkles className="w-3 h-3 text-amber-400" />
-            <span>Plan Here</span>
+            <span>Plan an Event Here</span>
           </button>
         </div>
       </div>

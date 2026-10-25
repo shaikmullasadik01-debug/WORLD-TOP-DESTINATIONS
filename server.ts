@@ -4,11 +4,13 @@
  */
 
 import express, { Request, Response, NextFunction } from 'express';
+import compression from 'compression';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { DESTINATIONS } from './src/data/destinations.js';
+import { sanitizeText, validateEventParameters } from './src/utils/validation.js';
 
 dotenv.config();
 
@@ -18,15 +20,25 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+// Enable gzip/brotli response compression for ultra-efficient payloads
+app.use(compression());
+
 // Security Headers Middleware
 app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https:;"
+  );
   next();
 });
 
-// JSON Body Parser with reasonable size limit
+// JSON Body Parser with strict 1mb limit
 app.use(express.json({ limit: '1mb' }));
 
 // In-Memory Rate Limiting (Protects AI endpoints against denial-of-service/rapid loop abuse)
@@ -38,7 +50,7 @@ const rateLimitMap = new Map<string, RateLimitRecord>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
 const MAX_REQUESTS_PER_WINDOW = 40; // up to 40 AI queries per minute per IP
 
-function rateLimiter(req: Request, res: Response, next: NextFunction) {
+function rateLimiter(req: Request, res: Response, next: NextFunction): void {
   const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'client';
   const now = Date.now();
   const record = rateLimitMap.get(ip);
@@ -49,9 +61,10 @@ function rateLimiter(req: Request, res: Response, next: NextFunction) {
   }
 
   if (record.count >= MAX_REQUESTS_PER_WINDOW) {
-    return res.status(429).json({
+    res.status(429).json({
       error: 'Rate limit exceeded. Please wait a moment before sending more requests.',
     });
+    return;
   }
 
   record.count += 1;
@@ -71,17 +84,9 @@ if (process.env.GEMINI_API_KEY) {
   });
 }
 
-// Helper: Sanitize string inputs to prevent injection and unbounded allocations
-function sanitizeString(input: unknown, maxLength = 250): string {
-  if (typeof input !== 'string') return '';
-  return input
-    .replace(/[<>]/g, '') // strip HTML tag brackets
-    .trim()
-    .slice(0, maxLength);
-}
-
-// Health check
+// Health check with cache-busting
 app.get('/api/health', (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.json({
     status: 'ok',
     hasApiKey: !!process.env.GEMINI_API_KEY,
@@ -89,8 +94,9 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
-// Destinations catalog endpoint
+// Destinations catalog endpoint with caching header for high performance
 app.get('/api/destinations', (_req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
   res.json({
     destinations: DESTINATIONS,
     total: DESTINATIONS.length,
@@ -219,28 +225,33 @@ export function generateSmartEventPlanFallback(params: {
 // AI Event Planner endpoint with rate limiting and strict validation
 app.post('/api/ai/plan-event', rateLimiter, async (req: Request, res: Response) => {
   try {
-    const rawEventType = sanitizeString(req.body.eventType, 50);
-    const rawDestination = sanitizeString(req.body.destination, 100);
-    const rawDate = sanitizeString(req.body.date, 30);
+    const rawEventType = sanitizeText(req.body.eventType, 50);
+    const rawDestination = sanitizeText(req.body.destination, 100);
+    const rawDate = sanitizeText(req.body.date, 30);
     const rawGuestCount = parseInt(req.body.guestCount, 10);
     const rawTotalBudgetMinor = parseInt(req.body.totalBudgetMinor, 10);
-    const rawCurrency = sanitizeString(req.body.currency, 10) || 'INR';
-    const rawStyle = sanitizeString(req.body.style, 150);
-    const rawTheme = sanitizeString(req.body.theme, 150);
-    const rawCultural = sanitizeString(req.body.culturalPreferences, 250);
-    const rawDietary = sanitizeString(req.body.dietaryPreferences, 250);
-    const rawAccessibility = sanitizeString(req.body.accessibilityRequirements, 250);
-    const rawSetting = sanitizeString(req.body.indoorOutdoor, 20);
+    const rawCurrency = sanitizeText(req.body.currency, 10) || 'INR';
+    const rawStyle = sanitizeText(req.body.style, 150);
+    const rawTheme = sanitizeText(req.body.theme, 150);
+    const rawCultural = sanitizeText(req.body.culturalPreferences, 250);
+    const rawDietary = sanitizeText(req.body.dietaryPreferences, 250);
+    const rawAccessibility = sanitizeText(req.body.accessibilityRequirements, 250);
+    const rawSetting = sanitizeText(req.body.indoorOutdoor, 20);
 
-    // Validation
-    if (!rawEventType || !rawDestination) {
-      return res.status(400).json({ error: 'Please provide valid event type and destination.' });
-    }
+    const validation = validateEventParameters({
+      eventType: rawEventType,
+      destination: rawDestination,
+      date: rawDate,
+      guestCount: rawGuestCount,
+      totalBudgetMinor: rawTotalBudgetMinor,
+    });
 
-    if (isNaN(rawTotalBudgetMinor) || rawTotalBudgetMinor < 100000 || rawTotalBudgetMinor > 500000000000) {
-      return res.status(400).json({
-        error: 'Budget amount must be between 1,000 and 5,000,000,000 in major units.',
+    if (!validation.isValid) {
+      res.status(400).json({
+        error: Object.values(validation.errors).join(' '),
+        errors: validation.errors,
       });
+      return;
     }
 
     const guestCount = isNaN(rawGuestCount) || rawGuestCount < 1 ? 100 : Math.min(rawGuestCount, 50000);
@@ -295,7 +306,8 @@ You must return a strictly formatted JSON object adhering to this schema:
         const rawText = response.text;
         if (rawText) {
           const parsed = JSON.parse(rawText.trim());
-          return res.json({ success: true, plan: parsed, provider: 'gemini-3.8-flash' });
+          res.json({ success: true, plan: parsed, provider: 'gemini-3.8-flash' });
+          return;
         }
       } catch (geminiError) {
         console.warn('Gemini API call returned fallback signal, activating smart deterministic engine.');
@@ -317,23 +329,24 @@ You must return a strictly formatted JSON object adhering to this schema:
       indoorOutdoor: rawSetting,
     });
 
-    return res.json({
+    res.json({
       success: true,
       plan: smartFallback,
       provider: 'smart-deterministic-planner',
     });
-  } catch (err: any) {
-    console.error('Handled error in /api/ai/plan-event:', err?.message || 'Unknown');
-    return res.status(500).json({ error: 'An unexpected error occurred while generating your plan. Please try again.' });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('Handled error in /api/ai/plan-event:', message);
+    res.status(500).json({ error: 'An unexpected error occurred while generating your plan. Please try again.' });
   }
 });
 
 // AI Theme and Decor Ideas endpoint with rate limiting
 app.post('/api/ai/theme-ideas', rateLimiter, async (req: Request, res: Response) => {
   try {
-    const rawEventType = sanitizeString(req.body.eventType, 50) || 'wedding';
-    const rawDestination = sanitizeString(req.body.destination, 100) || 'Udaipur, India';
-    const rawVibe = sanitizeString(req.body.vibe, 150) || 'luxury';
+    const rawEventType = sanitizeText(req.body.eventType, 50) || 'wedding';
+    const rawDestination = sanitizeText(req.body.destination, 100) || 'Udaipur, India';
+    const rawVibe = sanitizeText(req.body.vibe, 150) || 'luxury';
 
     if (ai) {
       try {
@@ -359,7 +372,8 @@ Return JSON array of:
 
         const raw = response.text;
         if (raw) {
-          return res.json({ success: true, themes: JSON.parse(raw.trim()) });
+          res.json({ success: true, themes: JSON.parse(raw.trim()) });
+          return;
         }
       } catch (geminiErr) {
         console.warn('Gemini theme generation fallback signal received.');
@@ -385,7 +399,7 @@ Return JSON array of:
         },
       ],
     });
-  } catch (err: any) {
+  } catch (err) {
     res.status(500).json({ error: 'Unable to synthesize theme concepts at this time.' });
   }
 });

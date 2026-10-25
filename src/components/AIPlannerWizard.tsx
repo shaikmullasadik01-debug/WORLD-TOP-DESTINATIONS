@@ -62,8 +62,43 @@ export const AIPlannerWizard: React.FC<AIPlannerWizardProps> = ({
   const [generatedPlan, setGeneratedPlan] = useState<AIPlanSummary | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleGeneratePlan = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Vendor Checklist State
+  const [vendorChecklist, setVendorChecklist] = useState<{ id: string; name: string; category: string; checked: boolean }[]>([
+    { id: 'vc-1', name: 'Heritage Palace / Ballroom Venue Buyout', category: 'Venue', checked: true },
+    { id: 'vc-2', name: 'Master Banquet Catering & Tastings', category: 'Catering', checked: false },
+    { id: 'vc-3', name: 'Floral Scenography & Mandap / Stage Design', category: 'Decor', checked: false },
+    { id: 'vc-4', name: '4K Cinematographer & Drone Aerial Crew', category: 'Photography', checked: false },
+    { id: 'vc-5', name: 'Acoustic Welcoming Ensemble & DJ Sound Rig', category: 'Entertainment', checked: false },
+    { id: 'vc-6', name: 'Airport VIP Guest Shuttles & Ferries', category: 'Logistics', checked: false },
+    { id: 'vc-7', name: 'Bridal Stylist & Groom Hair Team', category: 'Attire & Beauty', checked: false },
+    { id: 'vc-8', name: 'Digital Stationery & RSVP Concierge', category: 'Invitations', checked: false },
+  ]);
+
+  // Assumptions Editor State
+  const [isEditingAssumptions, setIsEditingAssumptions] = useState(false);
+  const [editableAssumptions, setEditableAssumptions] = useState<string[]>([]);
+
+  const handleApplyPreset = () => {
+    setEventType('wedding');
+    setSelectedDestinationName('Udaipur, India');
+    setGuestCount(100);
+    setRawBudget(1500000);
+    setStyle('Royal Mewar Heritage & Palatial Elegance');
+    setTheme('Imperial Gold, Crimson & Ivory');
+    setCulturalPreferences('Traditional Sangeet, Mehendi, Baraat & Vedic Vivah ceremonies');
+    setDietaryPreferences('Multi-course Rajasthani & International banquet with pure vegetarian live counters');
+    setAccessibilityRequirements('Golf cart lake pavilion transit and step-free courtyard ramps');
+    setIndoorOutdoor('hybrid');
+  };
+
+  const handleToggleVendorChecklist = (id: string) => {
+    setVendorChecklist((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item))
+    );
+  };
+
+  const handleGeneratePlan = async (e?: React.FormEvent, customAssumps?: string[]) => {
+    if (e) e.preventDefault();
     setIsGenerating(true);
     setErrorMsg(null);
 
@@ -86,6 +121,7 @@ export const AIPlannerWizard: React.FC<AIPlannerWizardProps> = ({
           dietaryPreferences,
           accessibilityRequirements,
           indoorOutdoor,
+          customAssumptions: customAssumps,
         }),
       });
 
@@ -95,9 +131,12 @@ export const AIPlannerWizard: React.FC<AIPlannerWizardProps> = ({
       }
 
       setGeneratedPlan(data.plan);
-    } catch (err: any) {
+      setEditableAssumptions(data.plan.assumptions || []);
+      setIsEditingAssumptions(false);
+    } catch (err: unknown) {
       console.error('Plan generation failed:', err);
-      setErrorMsg(err.message || 'Error communicating with AI service');
+      const message = err instanceof Error ? err.message : 'Error communicating with AI service';
+      setErrorMsg(message);
     } finally {
       setIsGenerating(false);
     }
@@ -195,7 +234,14 @@ export const AIPlannerWizard: React.FC<AIPlannerWizardProps> = ({
               <Calculator className="w-4 h-4 text-slate-700" />
               <span>Event Parameters</span>
             </h3>
-            <span className="text-xs text-slate-500 font-medium">Step 1 of 2</span>
+            <button
+              type="button"
+              onClick={handleApplyPreset}
+              className="text-[11px] font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg border border-amber-300 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-hidden"
+              title="Preload prompt benchmark: 100 Guests Wedding in Udaipur for ₹15,00,000"
+            >
+              ★ Load ₹15L Udaipur Wedding Benchmark
+            </button>
           </div>
 
           <form onSubmit={handleGeneratePlan} className="space-y-4 text-xs">
@@ -453,17 +499,122 @@ export const AIPlannerWizard: React.FC<AIPlannerWizardProps> = ({
                 </div>
               </div>
 
-              {/* Assumptions & Qualifications Box */}
-              <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200 text-xs space-y-2">
-                <div className="font-semibold text-amber-900 flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-amber-700" />
-                  <span>Important Budget Assumptions & Qualifications</span>
+              {/* Assumptions & Qualifications Box (Editable as required by prompt) */}
+              <div className="p-5 rounded-2xl bg-amber-50/70 border border-amber-200 text-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-amber-900 flex items-center gap-1.5">
+                    <HelpCircle className="w-4 h-4 text-amber-700" />
+                    <span>Budget Assumptions & Qualifications</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingAssumptions(!isEditingAssumptions)}
+                    className="text-[11px] font-semibold text-amber-900 hover:text-amber-950 underline focus-visible:ring-1 focus-visible:ring-amber-600"
+                  >
+                    {isEditingAssumptions ? 'Cancel Editing' : '✎ Edit Assumptions'}
+                  </button>
                 </div>
-                <ul className="list-disc pl-5 space-y-1 text-amber-950">
-                  {generatedPlan.assumptions.map((ass, idx) => (
-                    <li key={idx}>{ass}</li>
+
+                {isEditingAssumptions ? (
+                  <div className="space-y-3 pt-1">
+                    <p className="text-[11px] text-amber-800">
+                      Customize assumptions below and regenerate your feasibility plan:
+                    </p>
+                    {editableAssumptions.map((ass, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={ass}
+                          onChange={(e) => {
+                            const updated = [...editableAssumptions];
+                            updated[idx] = e.target.value;
+                            setEditableAssumptions(updated);
+                          }}
+                          className="flex-1 p-2 bg-white border border-amber-300 rounded-lg text-slate-800 text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditableAssumptions(editableAssumptions.filter((_, i) => i !== idx));
+                          }}
+                          className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-md"
+                          title="Remove assumption"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditableAssumptions([...editableAssumptions, 'New customized planning constraint'])}
+                        className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-medium text-[11px]"
+                      >
+                        + Add Constraint
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleGeneratePlan(undefined, editableAssumptions)}
+                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-[11px] flex items-center gap-1.5 shadow-xs"
+                      >
+                        <RotateCcw className="w-3 h-3 text-amber-400" />
+                        <span>Regenerate Plan with Custom Assumptions</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <ul className="list-disc pl-5 space-y-1 text-amber-950">
+                    {editableAssumptions.map((ass, idx) => (
+                      <li key={idx}>{ass}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Vendor Checklist Module (Required by Prompt Section 4) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-serif font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Vendor Onboarding & Contracting Checklist</span>
+                  </h4>
+                  <span className="text-xs text-slate-500 font-medium">
+                    {vendorChecklist.filter((v) => v.checked).length} of {vendorChecklist.length} engaged
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {vendorChecklist.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleToggleVendorChecklist(item.id)}
+                      className={`p-3 rounded-xl border text-left text-xs transition-colors flex items-center justify-between ${
+                        item.checked
+                          ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950'
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100/60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 ${
+                            item.checked
+                              ? 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {item.checked && '✓'}
+                        </div>
+                        <span className={item.checked ? 'font-semibold' : 'font-medium'}>
+                          {item.name}
+                        </span>
+                      </div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 shrink-0 ml-2">
+                        {item.category}
+                      </span>
+                    </button>
                   ))}
-                </ul>
+                </div>
               </div>
 
               {/* Alternatives: Economical, Balanced, Luxury */}

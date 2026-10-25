@@ -14,6 +14,13 @@ import {
 } from '../utils/currency';
 import { DESTINATIONS } from '../data/destinations';
 import { generateSmartEventPlanFallback } from '../../server';
+import {
+  sanitizeText,
+  isValidEmail,
+  isValidPhone,
+  validateEventParameters,
+  validateBudgetItemInput,
+} from '../utils/validation';
 
 describe('Currency & Financial Precision Math', () => {
   it('converts major units to integer minor units without float drift', () => {
@@ -252,5 +259,160 @@ describe('Specialized Module Calculations', () => {
     const checkedInCount = volunteers.filter((v) => v.status === 'checked_in').length;
     const pct = Math.round((checkedInCount / volunteers.length) * 100);
     expect(pct).toBe(50);
+  });
+});
+
+describe('Input Validation & Sanitization Engine', () => {
+  it('sanitizes malicious script tags and trims dangerous input', () => {
+    expect(sanitizeText('<script>alert("xss")</script>Udaipur')).toBe('alert("xss")Udaipur');
+    expect(sanitizeText('   Santorini, Greece   ')).toBe('Santorini, Greece');
+    expect(sanitizeText(12345 as any)).toBe('');
+  });
+
+  it('validates email addresses using standard RFC format', () => {
+    expect(isValidEmail('organizer@luxuryevents.com')).toBe(true);
+    expect(isValidEmail('invalid-email-address')).toBe(false);
+    expect(isValidEmail('')).toBe(true); // Optional field allowed
+  });
+
+  it('validates international phone numbers accurately', () => {
+    expect(isValidPhone('+91 98765 43210')).toBe(true);
+    expect(isValidPhone('+1 (555) 019-2834')).toBe(true);
+    expect(isValidPhone('abc-invalid')).toBe(false);
+    expect(isValidPhone('')).toBe(true); // Optional field allowed
+  });
+
+  it('enforces rigorous event parameter boundary constraints', () => {
+    const validParams = {
+      eventType: 'wedding',
+      destination: 'Udaipur, India',
+      date: '2027-02-14',
+      guestCount: 100,
+      totalBudgetMinor: 150000000,
+    };
+    expect(validateEventParameters(validParams).isValid).toBe(true);
+
+    // Invalid event type
+    expect(
+      validateEventParameters({ ...validParams, eventType: 'unknown_party' }).isValid
+    ).toBe(false);
+
+    // Zero / negative guests
+    expect(
+      validateEventParameters({ ...validParams, guestCount: 0 }).isValid
+    ).toBe(false);
+
+    // Excessive guests (> 50,000)
+    expect(
+      validateEventParameters({ ...validParams, guestCount: 100000 }).isValid
+    ).toBe(false);
+
+    // Unrealistic micro budget (< 100 currency units)
+    expect(
+      validateEventParameters({ ...validParams, totalBudgetMinor: 50 }).isValid
+    ).toBe(false);
+
+    // Invalid date string
+    expect(
+      validateEventParameters({ ...validParams, date: 'invalid-date' }).isValid
+    ).toBe(false);
+  });
+
+  it('validates budget item ledger entries against negative amounts', () => {
+    const validItem = {
+      name: 'Clifftop Pavilion Buyout',
+      category: 'venue',
+      estimatedMinor: 50000000,
+      actualMinor: 48000000,
+      paidMinor: 20000000,
+    };
+    expect(validateBudgetItemInput(validItem).isValid).toBe(true);
+
+    // Empty name
+    expect(
+      validateBudgetItemInput({ ...validItem, name: '' }).isValid
+    ).toBe(false);
+
+    // Negative estimate
+    expect(
+      validateBudgetItemInput({ ...validItem, estimatedMinor: -100 }).isValid
+    ).toBe(false);
+
+    // Paid exceeding actual cost
+    expect(
+      validateBudgetItemInput({ ...validItem, actualMinor: 1000, paidMinor: 2000 }).isValid
+    ).toBe(false);
+  });
+});
+
+describe('Multi-Currency Parity & Robustness', () => {
+  it('converts across all supported global currencies without NaN or infinite values', () => {
+    const supportedCurrencies: ('INR' | 'USD' | 'EUR' | 'GBP' | 'AED')[] = [
+      'INR',
+      'USD',
+      'EUR',
+      'GBP',
+      'AED',
+    ];
+    const baseMinor = 1000000; // 10,000 units
+
+    for (const fromCurr of supportedCurrencies) {
+      for (const toCurr of supportedCurrencies) {
+        const converted = convertMinorAmount(baseMinor, fromCurr, toCurr);
+        expect(Number.isFinite(converted)).toBe(true);
+        expect(converted).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe('Catalog Coverage & Multi-Axis Filter Invariants', () => {
+  it('covers all 8 distinct destination categories required by prompt specification', () => {
+    const requiredCategories = [
+      'Beaches and Islands',
+      'Luxury Resorts',
+      'Romantic Getaways',
+      'Mountains and Nature',
+      'Historic Landmarks',
+      'Modern Cities',
+      'Adventure Destinations',
+      'Indian Wedding Destinations',
+    ];
+
+    const presentCategories = new Set(DESTINATIONS.map((d) => d.category));
+    for (const cat of requiredCategories) {
+      expect(presentCategories.has(cat as any)).toBe(true);
+    }
+  });
+
+  it('guarantees every destination provides valid geographical coordinates', () => {
+    for (const d of DESTINATIONS) {
+      expect(typeof d.coordinates.lat).toBe('number');
+      expect(typeof d.coordinates.lng).toBe('number');
+      expect(d.coordinates.lat).toBeGreaterThanOrEqual(-90);
+      expect(d.coordinates.lat).toBeLessThanOrEqual(90);
+      expect(d.coordinates.lng).toBeGreaterThanOrEqual(-180);
+      expect(d.coordinates.lng).toBeLessThanOrEqual(180);
+    }
+  });
+
+  it('matches destinations across all 4 major calendar seasons', () => {
+    const seasons = ['spring', 'summer', 'autumn', 'winter'];
+    for (const s of seasons) {
+      const match = DESTINATIONS.some(
+        (d) => d.bestSeason.toLowerCase().includes(s) || d.bestSeason.toLowerCase().includes('year-round')
+      );
+      expect(match).toBe(true);
+    }
+  });
+
+  it('supports intimate, mid-size, and grand capacity venues', () => {
+    const hasIntimate = DESTINATIONS.some((d) => d.guestCapacityRange.min <= 50);
+    const hasMid = DESTINATIONS.some((d) => d.guestCapacityRange.max >= 200);
+    const hasGrand = DESTINATIONS.some((d) => d.guestCapacityRange.max >= 500);
+
+    expect(hasIntimate).toBe(true);
+    expect(hasMid).toBe(true);
+    expect(hasGrand).toBe(true);
   });
 });
