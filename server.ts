@@ -235,6 +235,8 @@ app.post('/api/ai/plan-event', rateLimiter, async (req: Request, res: Response) 
     const rawTheme = sanitizeText(req.body.theme, 150);
     const rawCultural = sanitizeText(req.body.culturalPreferences, 250);
     const rawDietary = sanitizeText(req.body.dietaryPreferences, 250);
+    const rawTravel = sanitizeText(req.body.travelRequirements, 250);
+    const rawAccommodation = sanitizeText(req.body.accommodationRequirements, 250);
     const rawAccessibility = sanitizeText(req.body.accessibilityRequirements, 250);
     const rawSetting = sanitizeText(req.body.indoorOutdoor, 20);
 
@@ -271,6 +273,8 @@ User Request:
 - Total Budget: ${rawTotalBudgetMinor / 100} ${rawCurrency}
 - Style & Theme: ${rawStyle || 'Elegant'} / ${rawTheme || 'Timeless'}
 - Cultural & Dietary Preferences: ${rawCultural || 'Standard'} / ${rawDietary || 'Standard'}
+- Travel Requirements: ${rawTravel || 'Standard private airport shuttles and transfers'}
+- Accommodation Requirements: ${rawAccommodation || 'Boutique suites and block reservations'}
 - Accessibility: ${rawAccessibility || 'Standard'}
 - Setting: ${rawSetting || 'hybrid'}
 

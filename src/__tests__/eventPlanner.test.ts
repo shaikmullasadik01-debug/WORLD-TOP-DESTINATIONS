@@ -13,6 +13,8 @@ import {
   calculateBudgetPercentage,
 } from '../utils/currency';
 import { DESTINATIONS } from '../data/destinations';
+import { THEME_INSPIRATIONS } from '../data/inspirations';
+import { INITIAL_EVENTS } from '../data/initialData';
 import { generateSmartEventPlanFallback } from '../../server';
 import {
   sanitizeText,
@@ -266,7 +268,7 @@ describe('Input Validation & Sanitization Engine', () => {
   it('sanitizes malicious script tags and trims dangerous input', () => {
     expect(sanitizeText('<script>alert("xss")</script>Udaipur')).toBe('alert("xss")Udaipur');
     expect(sanitizeText('   Santorini, Greece   ')).toBe('Santorini, Greece');
-    expect(sanitizeText(12345 as any)).toBe('');
+    expect(sanitizeText(12345 as unknown)).toBe('');
   });
 
   it('validates email addresses using standard RFC format', () => {
@@ -381,7 +383,7 @@ describe('Catalog Coverage & Multi-Axis Filter Invariants', () => {
 
     const presentCategories = new Set(DESTINATIONS.map((d) => d.category));
     for (const cat of requiredCategories) {
-      expect(presentCategories.has(cat as any)).toBe(true);
+      expect(presentCategories.has(cat as (typeof DESTINATIONS)[number]['category'])).toBe(true);
     }
   });
 
@@ -414,5 +416,54 @@ describe('Catalog Coverage & Multi-Axis Filter Invariants', () => {
     expect(hasIntimate).toBe(true);
     expect(hasMid).toBe(true);
     expect(hasGrand).toBe(true);
+  });
+});
+
+describe('Theme Studio Scenography & Initial Data Integrity', () => {
+  it('validates theme inspirations have valid hex color palettes and image prompts', () => {
+    expect(THEME_INSPIRATIONS.length).toBeGreaterThanOrEqual(4);
+
+    for (const theme of THEME_INSPIRATIONS) {
+      expect(theme.title.length).toBeGreaterThan(0);
+      expect(theme.prompt.length).toBeGreaterThan(20);
+      expect(theme.colorPalette.length).toBeGreaterThanOrEqual(4);
+      for (const swatch of theme.colorPalette) {
+        expect(swatch.hex).toMatch(/^#[0-9A-Fa-f]{6}$/);
+        expect(swatch.name.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('guarantees initial event datasets are non-empty and mathematically consistent', () => {
+    expect(INITIAL_EVENTS.length).toBeGreaterThanOrEqual(4);
+
+    const wedding = INITIAL_EVENTS.find((e) => e.type === 'wedding');
+    expect(wedding).toBeDefined();
+    if (wedding) {
+      expect(wedding.budgetItems.length).toBeGreaterThan(0);
+      expect(wedding.weddingDetails?.guests.length).toBeGreaterThan(0);
+      const sumBudget = wedding.budgetItems.reduce((acc, curr) => acc + curr.actualMinor, 0);
+      expect(sumBudget).toBeGreaterThan(0);
+    }
+
+    const corporate = INITIAL_EVENTS.find((e) => e.type === 'corporate');
+    expect(corporate).toBeDefined();
+    if (corporate) {
+      expect(corporate.corporateDetails?.speakers.length).toBeGreaterThan(0);
+    }
+
+    const birthday = INITIAL_EVENTS.find((e) => e.type === 'birthday');
+    expect(birthday).toBeDefined();
+    if (birthday) {
+      expect(birthday.birthdayDetails?.giftIdeas.length).toBeGreaterThan(0);
+      expect(birthday.birthdayDetails?.activities.length).toBeGreaterThan(0);
+    }
+
+    const festival = INITIAL_EVENTS.find((e) => e.type === 'festival');
+    expect(festival).toBeDefined();
+    if (festival) {
+      expect(festival.communityDetails?.volunteers.length).toBeGreaterThan(0);
+      expect(festival.communityDetails?.sponsors.length).toBeGreaterThan(0);
+    }
   });
 });

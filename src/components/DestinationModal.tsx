@@ -245,6 +245,15 @@ export const DestinationModal: React.FC<DestinationModalProps> = ({
             </div>
           </div>
 
+          {/* Benchmark Qualification & External Information Callout */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 flex items-start gap-2 leading-relaxed">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-slate-700">Data Qualification: </strong>
+              Budgets, pricing tiers, and capacity ranges are curated benchmark estimates based on 2026-2027 regional hospitality standards. Real-time availability, contracts, and seasonal blackout dates must be confirmed directly with individual venues.
+            </div>
+          </div>
+
           {/* Modal Footer CTA */}
           <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-xs text-slate-500">

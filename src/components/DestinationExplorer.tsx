@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { DESTINATIONS } from '../data/destinations';
-import { Destination, DestinationRegion, DestinationCategory, EventType } from '../types';
+import { Destination, DestinationRegion, DestinationCategory, EventType, SortOption } from '../types';
 import { DestinationCard } from './DestinationCard';
 import { useEventContext } from '../context/EventContext';
 import { Search, SlidersHorizontal, Heart, Clock, X, RotateCcw } from 'lucide-react';
@@ -33,7 +33,7 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
   const [selectedSeason, setSelectedSeason] = useState<string>('All');
   const [selectedSetting, setSelectedSetting] = useState<string>('All');
   const [selectedAccessibility, setSelectedAccessibility] = useState<string>('All');
-  const [sortBy, setSortBy] = useState<'recommended' | 'budget_asc' | 'budget_desc' | 'name'>('recommended');
+  const [sortBy, setSortBy] = useState<SortOption>('recommended');
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
@@ -313,7 +313,7 @@ export const DestinationExplorer: React.FC<DestinationExplorerProps> = ({
             <select
               aria-label="Sort destinations"
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
               className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-hidden focus:ring-1 focus:ring-slate-900"
             >
               <option value="recommended">Featured / Curated</option>

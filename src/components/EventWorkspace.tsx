@@ -9,7 +9,7 @@ import { BudgetManager } from './BudgetManager';
 import { TimelineManager } from './TimelineManager';
 import { VendorManager } from './VendorManager';
 import { ExportDossierModal } from './ExportDossierModal';
-import { WeddingGuest, CorporateSpeaker, VolunteerAssignment } from '../types';
+import { WeddingGuest, CorporateSpeaker, VolunteerAssignment, WorkspaceTab } from '../types';
 import { formatMoney, toMinorUnits } from '../utils/currency';
 import {
   Calendar,
@@ -237,7 +237,7 @@ export const EventWorkspace: React.FC = () => {
     const currentVols = activeEvent.communityDetails?.volunteers || [];
     const updated = currentVols.map((v) =>
       v.id === volId
-        ? { ...v, status: (v.status === 'checked_in' ? 'assigned' : 'checked_in') as any }
+        ? { ...v, status: (v.status === 'checked_in' ? 'assigned' : 'checked_in') as 'assigned' | 'checked_in' }
         : v
     );
 
@@ -399,18 +399,20 @@ export const EventWorkspace: React.FC = () => {
 
       {/* Workspace Navigation Tabs */}
       <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto pb-0 scrollbar-none" role="tablist">
-        {[
-          { id: 'overview', label: 'Executive Overview' },
-          { id: 'specialized', label: `${activeEvent.type.charAt(0).toUpperCase() + activeEvent.type.slice(1)} Hub` },
-          { id: 'budget', label: 'Budget & Finances' },
-          { id: 'timeline', label: `Timeline (${completedTasksCount}/${totalTasksCount})` },
-          { id: 'vendors', label: `Vendors (${activeEvent.vendors.length})` },
-        ].map((tab) => (
+        {(
+          [
+            { id: 'overview', label: 'Executive Overview' },
+            { id: 'specialized', label: `${activeEvent.type.charAt(0).toUpperCase() + activeEvent.type.slice(1)} Hub` },
+            { id: 'budget', label: 'Budget & Finances' },
+            { id: 'timeline', label: `Timeline (${completedTasksCount}/${totalTasksCount})` },
+            { id: 'vendors', label: `Vendors (${activeEvent.vendors.length})` },
+          ] as { id: WorkspaceTab; label: string }[]
+        ).map((tab) => (
           <button
             key={tab.id}
             role="tab"
             aria-selected={workspaceTab === tab.id}
-            onClick={() => setWorkspaceTab(tab.id as any)}
+            onClick={() => setWorkspaceTab(tab.id)}
             className={`py-3 px-4 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:outline-hidden ${
               workspaceTab === tab.id
                 ? 'border-slate-900 text-slate-900'

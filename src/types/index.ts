@@ -181,6 +181,10 @@ export interface AIPlanSummary {
   contingencyReserveMinor: number;
 }
 
+export type SettingType = 'indoor' | 'outdoor' | 'hybrid';
+export type WorkspaceTab = 'overview' | 'budget' | 'timeline' | 'vendors' | 'specialized';
+export type SortOption = 'recommended' | 'budget_asc' | 'budget_desc' | 'name';
+
 export interface EventPlan {
   id: string;
   title: string;
@@ -195,8 +199,10 @@ export interface EventPlan {
   theme: string;
   culturalPreferences: string;
   dietaryPreferences: string;
+  travelRequirements?: string;
+  accommodationRequirements?: string;
   accessibilityRequirements: string;
-  indoorOutdoor: 'indoor' | 'outdoor' | 'hybrid';
+  indoorOutdoor: SettingType;
   status: 'planning' | 'confirmed' | 'completed';
   createdAt: string;
   updatedAt: string;
