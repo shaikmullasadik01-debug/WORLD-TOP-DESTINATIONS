@@ -1,0 +1,111 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { ThemeInspiration } from '../types';
+
+export const THEME_INSPIRATIONS: ThemeInspiration[] = [
+  {
+    id: 'theme-royal-mewar-palace',
+    title: 'Royal Mewar Imperial Splendor',
+    eventType: 'wedding',
+    category: 'Royal Wedding Themes',
+    image: '/src/assets/images/royal_palace_celebration_1792901783052.jpg',
+    description: 'Opulent palace courtyard celebration with illuminated marble pavilions, floating lotus candles, marigold floral cascades, and warm gold ambient lanterns.',
+    prompt: 'Majestic royal palace courtyard banquet setup in Udaipur at dusk, illuminated marble pavilions, floating lotus candles in stone fountains, royal gold and marigold floral decorations, warm festive lanterns, regal grandeur, architectural photography, 8k',
+    colorPalette: [
+      { name: 'Royal Gold', hex: '#D4AF37' },
+      { name: 'Deep Burgundy', hex: '#800020' },
+      { name: 'Imperial Ivory', hex: '#FFFFF0' },
+      { name: 'Marigold Sunset', hex: '#F59E0B' },
+      { name: 'Palace Bronze', hex: '#4A3728' },
+    ],
+    tags: ['Royal', 'Palace', 'Udaipur', 'Heritage', 'Chandeliers'],
+  },
+  {
+    id: 'theme-luxury-cliffside-vows',
+    title: 'Amalfi Cliffside Orchid Mandap',
+    eventType: 'wedding',
+    category: 'Luxury Wedding Stages',
+    image: '/src/assets/images/luxury_wedding_mandap_1792901781491.jpg',
+    description: 'Breathtaking ocean cliffside ceremony stage draped in white chiffon and cascading blush roses, anchored by suspended crystal chandeliers at golden hour.',
+    prompt: 'Opulent luxury destination wedding ceremony stage on an ocean cliffside at sunset, abundant cascading white and blush roses, hanging crystal chandeliers, sheer chiffon drapes, warm golden ambient lighting, elegant luxury event design, architectural elegance, 8k commercial quality',
+    colorPalette: [
+      { name: 'Blush Rose', hex: '#F4C2C2' },
+      { name: 'Aegean Azure', hex: '#007791' },
+      { name: 'Crystal White', hex: '#FFFFFF' },
+      { name: 'Champagne Shimmer', hex: '#F7E7CE' },
+      { name: 'Warm Terracotta', hex: '#E07A5F' },
+    ],
+    tags: ['Cliffside', 'Mandap', 'Sunset', 'Floral Arch', 'Oceanview'],
+  },
+  {
+    id: 'theme-coastal-lagoon-reception',
+    title: 'Tropical Twilight Lagoon Gala',
+    eventType: 'wedding',
+    category: 'Beach Weddings',
+    image: '/src/assets/images/coastal_reception_gala_1792901782521.jpg',
+    description: 'Barefoot luxury waterfront banquet beneath an illuminated canopy of warm fairy lights, candlelit floral runner tables, and tranquil lagoon waters.',
+    prompt: 'Glamorous open-air evening wedding reception dinner beside a tranquil tropical lagoon, warm fairy light canopy overhead, candlelit banquet tables with fine porcelain and champagne flutes, palm trees silhouetted against twilight sky, luxury resort atmosphere, 8k photo',
+    colorPalette: [
+      { name: 'Warm Amber Light', hex: '#F59E0B' },
+      { name: 'Midnight Indigo', hex: '#1E1B4B' },
+      { name: 'Sand Taupe', hex: '#D2B48C' },
+      { name: 'Eucalyptus Green', hex: '#5F8575' },
+      { name: 'Linen Cream', hex: '#FAF9F6' },
+    ],
+    tags: ['Beachfront', 'Fairy Lights', 'Banquet', 'Tropical', 'Lagoon'],
+  },
+  {
+    id: 'theme-zen-minimalist-botanical',
+    title: 'Kyoto Zen Bamboo & Garden Serenity',
+    eventType: 'anniversary',
+    category: 'Garden Ceremonies',
+    image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1000&q=80',
+    description: 'Clean architectural lines with Japanese moss stone gardens, weeping wisteria blossoms, natural cedar wood furnishings, and paper lanterns.',
+    prompt: 'Refined Japanese Zen garden pavilion celebration in Kyoto with natural cedar wood tables, moss rock arrangements, hanging paper lanterns, delicate weeping cherry blossoms, serene minimalist atmosphere, editorial photography',
+    colorPalette: [
+      { name: 'Bamboo Moss', hex: '#4A5D4E' },
+      { name: 'Cherry Petal', hex: '#FFB7C5' },
+      { name: 'Cedar Wood', hex: '#8B5A2B' },
+      { name: 'Washi Paper', hex: '#F5F5F0' },
+      { name: 'Slate Stone', hex: '#475569' },
+    ],
+    tags: ['Zen', 'Minimalist', 'Kyoto', 'Nature', 'Wood'],
+  },
+  {
+    id: 'theme-skyline-metropolitan-gala',
+    title: 'Manhattan Midnight Sky Gala',
+    eventType: 'corporate',
+    category: 'Modern Cities',
+    image: 'https://images.unsplash.com/photo-1518391846015-55a9cc003b25?auto=format&fit=crop&w=1000&q=80',
+    description: 'High-altitude executive elegance with panoramic glass windows overlooking city lights, chrome accents, brushed platinum, and deep cobalt ambient uplighting.',
+    prompt: 'High-end executive corporate awards gala on a Manhattan penthouse rooftop overlooking the glittering New York skyline at night, sleek black glass tables, platinum centerpieces, modern architectural lighting, 8k resolution',
+    colorPalette: [
+      { name: 'Obsidian Black', hex: '#0F172A' },
+      { name: 'Brushed Platinum', hex: '#E2E8F0' },
+      { name: 'Cobalt Neon', hex: '#2563EB' },
+      { name: 'Champagne Gold', hex: '#EAB308' },
+      { name: 'Graphite Slate', hex: '#334155' },
+    ],
+    tags: ['Skyline', 'Corporate', 'Executive', 'Black Tie', 'Modern'],
+  },
+  {
+    id: 'theme-alpine-winter-wonderland',
+    title: 'Swiss Glacier Chalet Chic',
+    eventType: 'birthday',
+    category: 'Mountains and Nature',
+    image: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?auto=format&fit=crop&w=1000&q=80',
+    description: 'Cozy alpine luxury featuring roaring outdoor stone fireplaces, faux fur blankets, frosted pine wreaths, ice glass sculptures, and warm mulled wine bars.',
+    prompt: 'Luxury winter alpine chalet party in St. Moritz Switzerland with stone fireplaces, warm candlelit wood tables, frosted pine garland centerpieces, snowy mountain peaks visible through tall glass windows, 8k commercial photography',
+    colorPalette: [
+      { name: 'Glacier Ice Blue', hex: '#BAE6FD' },
+      { name: 'Frosted Pine', hex: '#166534' },
+      { name: 'Alpine Snow', hex: '#F8FAFC' },
+      { name: 'Hearth Wood', hex: '#78350F' },
+      { name: 'Warm Cinnamon', hex: '#9A3412' },
+    ],
+    tags: ['Winter', 'Chalet', 'Alps', 'Cozy', 'Fireplace'],
+  },
+];
